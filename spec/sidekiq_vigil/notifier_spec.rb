@@ -72,6 +72,14 @@ RSpec.describe "notifiers" do
     expect(transport.requests.first[:url]).to eq("https://hooks.slack.test/incidents")
   end
 
+  it "posts Block Kit through Net::HTTP with WebMock verification" do
+    request = stub_request(:post, "https://hooks.slack.test/default").to_return(status: 200, body: "ok")
+    slack = SidekiqVigil::Notifier::Slack.new(options: { webhook_url: "https://hooks.slack.test/default" })
+
+    expect(slack.notify(event)).to be(true)
+    expect(request).to have_been_requested.once
+  end
+
   it "retries with exponential backoff and falls back to log" do
     failed = SidekiqVigil::Notifier::HttpTransport::Response.new(code: "500", body: "no")
     transport = NotifierTransportStub.new(failed, failed, failed, failed)

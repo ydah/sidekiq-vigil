@@ -19,12 +19,12 @@ module SidekiqVigil
     )
       @storage = storage
       @config = config
-      @leader_election = leader_election || LeaderElection.new(storage:, ttl: config.interval * 3)
-      @notifier_manager = notifier_manager || build_notifier_manager
-      @alert_manager = alert_manager || build_alert_manager
       @logger = logger
       @clock = clock
       @sleeper = sleeper
+      @leader_election = leader_election || LeaderElection.new(storage:, ttl: config.interval * 3)
+      @notifier_manager = notifier_manager || build_notifier_manager
+      @alert_manager = alert_manager || build_alert_manager
       @running = false
       @direct_redis_notified = false
     end

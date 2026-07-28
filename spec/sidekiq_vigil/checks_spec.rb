@@ -96,6 +96,15 @@ RSpec.describe "built-in checks", :redis do
     expect(result).to have_attributes(severity: :critical, value: 1)
   end
 
+  it "tracks how long a process has remained quiet using public process state" do
+    api.process_items = [{ "identity" => "worker-1", "quiet" => "true" }]
+    vigil_storage.set("check_state:quiet:worker-1", now.to_f - 901, ttl: 3_600)
+
+    result = execute(SidekiqVigil::Check::ProcessAlive, { min_processes: 1, quiet_threshold: 900 }).first
+
+    expect(result).to have_attributes(severity: :critical, value: 0)
+  end
+
   it "alerts only after utilization is sustained" do
     api.process_items = [{ "busy" => 9, "concurrency" => 10 }]
     first = execute(SidekiqVigil::Check::Utilization, { warn: 0.8, critical: 0.95, sustained: 300 }).first
@@ -217,5 +226,35 @@ RSpec.describe "built-in checks", :redis do
 
     expect(result).to have_attributes(severity: :warn, value: 20)
     expect(result.metadata[:baseline]).to eq(110.0)
+  end
+
+  it "preserves local wall-clock time across daylight-saving boundaries" do
+    current = Time.utc(2026, 3, 9, 13, 0)
+
+    previous = SidekiqVigil::Timezone.same_local_days_ago(current, 2, "America/New_York")
+
+    expect(previous.utc).to eq(Time.utc(2026, 3, 7, 14, 0))
+  end
+end
+
+RSpec.describe SidekiqVigil::SidekiqApi do
+  it "normalizes the public WorkSet API for stuck-job checks" do
+    work = instance_double(
+      Sidekiq::Work,
+      run_at: Time.utc(2026, 7, 28, 12),
+      payload: { "class" => "SlowJob" }
+    )
+    allow(Sidekiq::Workers).to receive(:new).and_return([["process", "thread", work]])
+
+    expect(described_class.new.workers).to eq([
+                                                {
+                                                  process_id: "process",
+                                                  thread_id: "thread",
+                                                  work: {
+                                                    "run_at" => Time.utc(2026, 7, 28, 12).to_f,
+                                                    "payload" => { "class" => "SlowJob" }
+                                                  }
+                                                }
+                                              ])
   end
 end

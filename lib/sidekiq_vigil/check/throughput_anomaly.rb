@@ -33,7 +33,8 @@ module SidekiqVigil
       def baseline_samples
         days = options.fetch(:baseline_days, 7)
         (1..days).filter_map do |days_ago|
-          sample = window_total(clock.call - (days_ago * 86_400))
+          sample_time = Timezone.same_local_days_ago(clock.call, days_ago, options.fetch(:timezone, "UTC"))
+          sample = window_total(sample_time)
           sample if sample.positive?
         end
       end

@@ -20,6 +20,7 @@ module SidekiqVigil
     def run(arguments)
       args = arguments.dup
       load_config(extract_config_path(args))
+      configure_sidekiq_api
       command = args.shift || "run"
       handler = command_handlers(args)[command]
       return unknown_command(command) unless handler
@@ -66,6 +67,12 @@ module SidekiqVigil
 
       Kernel.load(File.expand_path(path))
       config.validate!
+    end
+
+    def configure_sidekiq_api
+      return unless config.redis
+
+      Sidekiq.configure_client { |sidekiq| sidekiq.redis = config.redis.compact }
     end
 
     def run_forever(_args = [])

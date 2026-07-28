@@ -66,7 +66,7 @@ module SidekiqVigil
     end
 
     def external_notifications_enabled?
-      production? || (@enabled_explicit && enabled?)
+      enabled? && (production? || @enabled_explicit)
     end
 
     def check(name_or_class, **options)
@@ -110,6 +110,7 @@ module SidekiqVigil
         key_prefix: key_prefix,
         timezone: timezone,
         checks: checks.map { |item| [item.name, item.options] },
+        notifiers: notifiers.map { |item| [item.name, item.options] },
         alerting: alerting.to_h
       }
       Digest::SHA256.hexdigest(JSON.generate(payload))
@@ -153,12 +154,15 @@ module SidekiqVigil
     end
 
     def validate_options!(options, context)
-      options.each do |key, value|
-        next unless numeric_threshold?(key)
-        next if value.is_a?(Numeric) && !value.negative?
+      options.each { |key, value| validate_option!(key, value, context) }
+    end
 
-        raise ConfigError, "#{context} #{key} must not be negative"
-      end
+    def validate_option!(key, value, context)
+      return value.each_value { |thresholds| validate_options!(thresholds, context) } if key.to_sym == :per_queue && value.is_a?(Hash)
+      return unless numeric_threshold?(key)
+      return if value.is_a?(Numeric) && !value.negative?
+
+      raise ConfigError, "#{context} #{key} must not be negative"
     end
 
     def numeric_threshold?(key)
@@ -193,10 +197,9 @@ module SidekiqVigil
     end
 
     def validate!
-      %i[pending_cycles cooldown flap_window group_threshold].each do |name|
-        value = public_send(name)
-        raise ConfigError, "#{name} must not be negative" unless value.is_a?(Numeric) && !value.negative?
-      end
+      validate_numeric_fields!
+      validate_escalation!
+      mutes.each { |mute| validate_mute!(mute) }
       self
     end
 
@@ -210,6 +213,29 @@ module SidekiqVigil
         group_threshold: group_threshold,
         mutes: mutes
       }
+    end
+
+    private
+
+    def validate_numeric_fields!
+      %i[pending_cycles cooldown flap_window group_threshold].each do |name|
+        value = public_send(name)
+        raise ConfigError, "#{name} must not be negative" unless value.is_a?(Numeric) && !value.negative?
+      end
+    end
+
+    def validate_escalation!
+      return unless escalate_after
+      return if escalate_after.is_a?(Numeric) && !escalate_after.negative?
+
+      raise ConfigError, "escalate_after must not be negative"
+    end
+
+    def validate_mute!(mute)
+      raise ConfigError, "mute cron must contain five fields" unless mute.fetch(:cron).split.length == 5
+
+      duration = mute.fetch(:duration)
+      raise ConfigError, "mute duration must be positive" unless duration.is_a?(Numeric) && duration.positive?
     end
   end
 end

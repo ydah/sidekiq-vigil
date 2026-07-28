@@ -17,6 +17,14 @@ RSpec.describe SidekiqVigil::Config do
     expect(config.runnable_notifiers.map(&:name)).to eq([:slack])
   end
 
+  it "disables external notifiers in production when the runtime is disabled" do
+    config = described_class.new(environment: "production")
+    config.enabled = false
+    config.notifier(:slack, webhook_url: "https://hooks.slack.test/a")
+
+    expect(config.runnable_notifiers).to be_empty
+  end
+
   it "allows an explicit opt-in outside production" do
     config = described_class.new(environment: "test")
     config.enabled = true
@@ -60,6 +68,16 @@ RSpec.describe SidekiqVigil::Config do
     expect { config.validate! }.to raise_error(SidekiqVigil::ConfigError, /must not be negative/)
   end
 
+  it "rejects negative per-queue thresholds and invalid mute windows" do
+    config = described_class.new
+    config.check(:queue_size, per_queue: { "critical" => { warn: -1 } })
+    expect { config.validate! }.to raise_error(SidekiqVigil::ConfigError, /must not be negative/)
+
+    config = described_class.new
+    config.alerting.mutes = [{ cron: "* * *", duration: 60 }]
+    expect { config.validate! }.to raise_error(SidekiqVigil::ConfigError, /five fields/)
+  end
+
   it "rejects plain-text Slack mentions with actionable guidance" do
     config = described_class.new(environment: "production")
     config.notifier(:slack, webhook_url: "https://hooks.slack.test/a", mention: { critical: "@oncall" })
@@ -84,5 +102,11 @@ RSpec.describe SidekiqVigil::Config do
     expect(first.digest).to eq(second.digest)
     second.interval = 60
     expect(first.digest).not_to eq(second.digest)
+
+    third = described_class.new(environment: "production")
+    third.notifier(:webhook, url: "https://one.example.test")
+    fourth = described_class.new(environment: "production")
+    fourth.notifier(:webhook, url: "https://two.example.test")
+    expect(third.digest).not_to eq(fourth.digest)
   end
 end

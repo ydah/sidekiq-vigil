@@ -10,6 +10,12 @@ RSpec.describe SidekiqVigil::Storage, :redis do
     expect(redis.call("TTL", "vigil:myapp:snapshot")).to be_between(1, 60)
   end
 
+  it "supports fractional ttl values for short checker intervals" do
+    vigil_storage.set("short", "value", ttl: 0.5)
+
+    expect(redis.call("PTTL", vigil_storage.key("short"))).to be_between(1, 500)
+  end
+
   it "rejects writes without a positive ttl" do
     expect { vigil_storage.set("unsafe", "x", ttl: nil) }.to raise_error(described_class::MissingTTL)
     expect { vigil_storage.hash_write("unsafe", { "a" => 1 }, ttl: 0) }.to raise_error(described_class::MissingTTL)

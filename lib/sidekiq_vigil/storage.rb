@@ -19,7 +19,7 @@ module SidekiqVigil
 
     def set(suffix, value, ttl:)
       require_ttl!(ttl)
-      with_redis { |redis| redis.call("SET", key(suffix), value, "EX", ttl) }
+      with_redis { |redis| redis.call("SET", key(suffix), value, "PX", ttl_ms(ttl)) }
     end
 
     def get(suffix)
@@ -33,7 +33,7 @@ module SidekiqVigil
       with_redis do |redis|
         redis.pipelined do |pipeline|
           pipeline.call("HSET", key(suffix), *values.flatten)
-          pipeline.call("EXPIRE", key(suffix), ttl)
+          pipeline.call("PEXPIRE", key(suffix), ttl_ms(ttl))
         end
       end
     end
@@ -48,7 +48,7 @@ module SidekiqVigil
             command = amount.is_a?(Integer) ? "HINCRBY" : "HINCRBYFLOAT"
             pipeline.call(command, key(suffix), field, amount)
           end
-          pipeline.call("EXPIRE", key(suffix), ttl)
+          pipeline.call("PEXPIRE", key(suffix), ttl_ms(ttl))
         end
       end
     end
@@ -73,7 +73,7 @@ module SidekiqVigil
         redis.pipelined do |pipeline|
           pipeline.call("RPUSH", key(suffix), value)
           pipeline.call("LTRIM", key(suffix), -limit, -1)
-          pipeline.call("EXPIRE", key(suffix), ttl)
+          pipeline.call("PEXPIRE", key(suffix), ttl_ms(ttl))
         end
       end
     end
@@ -120,6 +120,10 @@ module SidekiqVigil
 
     def require_ttl!(ttl)
       raise MissingTTL, "a positive ttl is required" unless ttl.is_a?(Numeric) && ttl.positive?
+    end
+
+    def ttl_ms(ttl)
+      (ttl * 1_000).ceil
     end
 
     def with_redis(&)

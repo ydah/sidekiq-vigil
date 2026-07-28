@@ -5,7 +5,7 @@ require "sidekiq_vigil"
 SidekiqVigil.configure do |config|
   # Monitoring is enabled by default. External notification is enabled by
   # default only in production; set this explicitly to opt in elsewhere.
-  config.enabled = ENV.fetch("VIGIL_ENABLED", "true") == "true"
+  config.enabled = ENV.fetch("VIGIL_ENABLED") == "true" if ENV.key?("VIGIL_ENABLED")
   config.interval = Integer(ENV.fetch("VIGIL_INTERVAL", "30"))
   config.flush_interval = Integer(ENV.fetch("VIGIL_FLUSH_INTERVAL", "10"))
   config.key_prefix = ENV.fetch("VIGIL_KEY_PREFIX", "myapp")

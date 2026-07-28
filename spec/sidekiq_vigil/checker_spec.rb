@@ -49,6 +49,19 @@ RSpec.describe SidekiqVigil::Checker, :redis do
     expect(notifier_manager).to have_received(:notify)
   end
 
+  it "builds its default alert manager with the injected clock" do
+    instance = described_class.new(
+      storage: vigil_storage,
+      config:,
+      leader_election: leader,
+      notifier_manager:,
+      logger:,
+      clock: -> { Time.utc(2026, 7, 28, 12) }
+    )
+
+    expect(instance.run_once).to be_an(Array)
+  end
+
   it "does not execute checks when leadership is held elsewhere" do
     allow(leader).to receive(:acquire).and_return(false)
 

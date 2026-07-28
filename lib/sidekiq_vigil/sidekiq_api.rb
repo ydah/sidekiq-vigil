@@ -22,7 +22,14 @@ module SidekiqVigil
 
     def workers
       Sidekiq::Workers.new.map do |process_id, thread_id, work|
-        { process_id:, thread_id:, work: }
+        {
+          process_id:,
+          thread_id:,
+          work: {
+            "run_at" => work.run_at.to_f,
+            "payload" => work.payload
+          }
+        }
       end
     end
 
