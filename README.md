@@ -1,8 +1,6 @@
-# Sidekiq Vigil
+# Sidekiq Vigil [![Gem Version](https://badge.fury.io/rb/sidekiq-vigil.svg)](https://badge.fury.io/rb/sidekiq-vigil) [![CI](https://github.com/ydah/sidekiq-vigil/actions/workflows/main.yml/badge.svg)](https://github.com/ydah/sidekiq-vigil/actions/workflows/main.yml)
 
 Sidekiq Vigil is battery-included monitoring and alerting for Sidekiq. It runs against the Redis you already use, evaluates twelve health checks, keeps an alert lifecycle across restarts, and sends firing, ongoing, and recovery notifications.
-
-[![CI](https://github.com/ydah/sidekiq-vigil/actions/workflows/main.yml/badge.svg)](https://github.com/ydah/sidekiq-vigil/actions/workflows/main.yml)
 
 ## Requirements
 
