@@ -45,22 +45,24 @@ module SidekiqVigil
       def scheduled_reason
         schedules.each do |schedule|
           duration = schedule.fetch(:duration)
-          minutes = (duration / 60.0).ceil
-          matched = (0..minutes).any? do |offset|
-            candidate = Timezone.local_time(clock.call - (offset * 60), timezone)
-            cron_match?(schedule.fetch(:cron), candidate)
-          end
+          matched = active_schedule?(schedule.fetch(:cron), duration)
           return schedule.fetch(:reason, "scheduled maintenance") if matched
         end
         nil
       end
 
-      def cron_match?(expression, time)
-        fields = expression.split
-        raise ConfigError, "mute cron must contain five fields" unless fields.length == 5
+      def active_schedule?(expression, duration)
+        current = clock.call
+        current_minute = Time.at((current.to_f / 60).floor * 60)
+        cron = Cron.new(expression)
+        minute_count = (duration / 60.0).ceil
 
-        values = [time.min, time.hour, time.day, time.month, time.wday]
-        fields.zip(values).all? { |field, value| field == "*" || field.split(",").map(&:to_i).include?(value) }
+        (0..minute_count).any? do |offset|
+          start_time = current_minute - (offset * 60)
+          next false unless current.to_f < start_time.to_f + duration
+
+          cron.match?(Timezone.local_time(start_time, timezone))
+        end
       end
     end
   end

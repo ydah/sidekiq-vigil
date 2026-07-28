@@ -76,6 +76,26 @@ RSpec.describe SidekiqVigil::Config do
     config = described_class.new
     config.alerting.mutes = [{ cron: "* * *", duration: 60 }]
     expect { config.validate! }.to raise_error(SidekiqVigil::ConfigError, /five fields/)
+
+    config.alerting.mutes = [{ cron: "61 * * * *", duration: 60 }]
+    expect { config.validate! }.to raise_error(SidekiqVigil::ConfigError, /invalid mute cron field/)
+  end
+
+  it "accepts complete five-field cron syntax for mute windows" do
+    config = described_class.new
+    config.alerting.mutes = [{ cron: "*/10 2-4 1,15 * 1-5", duration: 60 }]
+
+    expect(config.validate!).to be(config)
+  end
+
+  it "rejects alert counts that cannot produce a valid state or digest" do
+    config = described_class.new
+    config.alerting.pending_cycles = 0
+    expect { config.validate! }.to raise_error(SidekiqVigil::ConfigError, /positive integer/)
+
+    config.alerting.pending_cycles = 1
+    config.alerting.group_top_n = 0
+    expect { config.validate! }.to raise_error(SidekiqVigil::ConfigError, /positive integer/)
   end
 
   it "rejects plain-text Slack mentions with actionable guidance" do

@@ -21,7 +21,7 @@ module SidekiqVigil
         muted = mute.active?
         events = results.filter_map { |result| process_result(result, persisted, muted) }
         prune(persisted.keys - active_ids)
-        Grouping.apply(events, threshold: config.group_threshold, timestamp: now)
+        Grouping.apply(events, threshold: config.group_threshold, timestamp: now, limit: config.group_top_n)
       end
 
       private
@@ -30,6 +30,7 @@ module SidekiqVigil
 
       def process_result(result, persisted, muted)
         state = State.load(persisted.fetch(result.alert_id, "{}"))
+        refresh_flapping(state)
         record_history(result)
         event = transition(result, state)
         event ||= unsuppressed_event(result, state) unless muted
@@ -60,14 +61,15 @@ module SidekiqVigil
 
         state.cycles += 1
         update_observation(state, result)
+        return if flapping_active?(state)
+
         fire(result, state, :firing) if state.cycles >= config.pending_cycles
       end
 
       def transition_from_firing(result, state)
         if result.ok?
           previous_severity = state.severity
-          state.status = "resolved"
-          state.last_transition_at = now.to_f
+          change_status(state, "resolved")
           state.suppressed = false
           state.severity = previous_severity
           return build_event(result, :resolved, state) if config.resolve_notice
@@ -88,33 +90,35 @@ module SidekiqVigil
       def transition_from_resolved(result, state)
         return update_ok(state, result) if result.ok?
 
-        flapping = now.to_f - state.last_transition_at.to_f <= config.flap_window
         begin_pending(state, result)
-        return unless flapping && !state.flap_notified
+        if flapping?(state)
+          state.flapping_until = now.to_f + config.flap_window
+          return if state.flap_notified
 
-        state.flap_notified = true
-        build_event(result, :flapping, state)
+          state.flap_notified = true
+          return build_event(result, :flapping, state)
+        end
+
+        fire(result, state, :firing) if state.cycles >= config.pending_cycles
       end
 
       def begin_pending(state, result)
-        state.status = "pending"
+        change_status(state, "pending")
         state.cycles = 1
         state.first_seen_at = now.to_f
-        state.last_transition_at = now.to_f
-        state.flap_notified = false
         update_observation(state, result)
       end
 
       def fire(result, state, transition)
-        state.status = "firing"
+        change_status(state, "firing")
         state.last_notified_at = now.to_f
-        state.last_transition_at = now.to_f if transition == :firing
         state.suppressed = false
+        state.flapping_until = nil
         build_event(result, transition, state)
       end
 
       def update_ok(state, result)
-        state.status = "ok"
+        change_status(state, "ok")
         state.cycles = 0
         state.first_seen_at = nil
         state.severity = "ok"
@@ -179,6 +183,40 @@ module SidekiqVigil
       def reset_invalid_state(result, state)
         state.status = "ok"
         transition_from_ok(result, state)
+      end
+
+      def change_status(state, status)
+        return if state.status == status
+
+        state.status = status
+        state.last_transition_at = now.to_f
+        state.transition_timestamps << now.to_f
+        prune_transition_timestamps(state)
+      end
+
+      def flapping?(state)
+        return false unless config.flap_window.positive? && config.flap_threshold.positive?
+
+        prune_transition_timestamps(state)
+        state.transition_timestamps.length >= config.flap_threshold
+      end
+
+      def flapping_active?(state)
+        state.flapping_until && now.to_f < state.flapping_until
+      end
+
+      def refresh_flapping(state)
+        prune_transition_timestamps(state)
+        return if flapping_active?(state)
+        return if state.transition_timestamps.length >= config.flap_threshold
+
+        state.flapping_until = nil
+        state.flap_notified = false
+      end
+
+      def prune_transition_timestamps(state)
+        cutoff = now.to_f - config.flap_window
+        state.transition_timestamps.select! { |timestamp| timestamp.to_f >= cutoff }
       end
 
       def now

@@ -184,15 +184,18 @@ module SidekiqVigil
   end
 
   class AlertingConfig
-    attr_accessor :pending_cycles, :cooldown, :resolve_notice, :flap_window, :escalate_after, :group_threshold, :mutes
+    attr_accessor :pending_cycles, :cooldown, :resolve_notice, :flap_window, :flap_threshold, :escalate_after,
+                  :group_threshold, :group_top_n, :mutes
 
     def initialize
       @pending_cycles = 2
       @cooldown = 600
       @resolve_notice = true
       @flap_window = 120
+      @flap_threshold = 4
       @escalate_after = nil
       @group_threshold = 5
+      @group_top_n = 5
       @mutes = []
     end
 
@@ -209,8 +212,10 @@ module SidekiqVigil
         cooldown: cooldown,
         resolve_notice: resolve_notice,
         flap_window: flap_window,
+        flap_threshold: flap_threshold,
         escalate_after: escalate_after,
         group_threshold: group_threshold,
+        group_top_n: group_top_n,
         mutes: mutes
       }
     end
@@ -218,9 +223,13 @@ module SidekiqVigil
     private
 
     def validate_numeric_fields!
-      %i[pending_cycles cooldown flap_window group_threshold].each do |name|
+      %i[cooldown flap_window group_threshold].each do |name|
         value = public_send(name)
         raise ConfigError, "#{name} must not be negative" unless value.is_a?(Numeric) && !value.negative?
+      end
+      %i[pending_cycles flap_threshold group_top_n].each do |name|
+        value = public_send(name)
+        raise ConfigError, "#{name} must be a positive integer" unless value.is_a?(Integer) && value.positive?
       end
     end
 
@@ -232,7 +241,7 @@ module SidekiqVigil
     end
 
     def validate_mute!(mute)
-      raise ConfigError, "mute cron must contain five fields" unless mute.fetch(:cron).split.length == 5
+      Alert::Cron.new(mute.fetch(:cron))
 
       duration = mute.fetch(:duration)
       raise ConfigError, "mute duration must be positive" unless duration.is_a?(Numeric) && duration.positive?

@@ -7,7 +7,7 @@ module SidekiqVigil
     class State
       ATTRIBUTES = %i[
         status cycles first_seen_at last_notified_at last_transition_at severity value threshold message suppressed
-        flap_notified
+        flap_notified flapping_until transition_timestamps
       ].freeze
 
       attr_accessor(*ATTRIBUTES)
@@ -25,6 +25,8 @@ module SidekiqVigil
         @message = attributes[:message]
         @suppressed = attributes.fetch(:suppressed, false)
         @flap_notified = attributes.fetch(:flap_notified, false)
+        @flapping_until = attributes[:flapping_until]
+        @transition_timestamps = attributes.fetch(:transition_timestamps, [])
       end
 
       def self.load(json)
