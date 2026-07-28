@@ -2,6 +2,7 @@ AllCops:
   NewCops: enable
   TargetRubyVersion: 3.2
   SuggestExtensions: false
+  UseCache: false
   Exclude:
     - "vendor/**/*"
     - "gemfiles/**/*"
@@ -24,7 +25,11 @@ Metrics/MethodLength:
   Max: 35
 
 Metrics/ParameterLists:
-  Max: 7
+  Max: 8
+
+Naming/PredicateMethod:
+  AllowedMethods:
+    - notify
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes

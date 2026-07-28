@@ -8,7 +8,25 @@ module SidekiqVigil
 
   class Config
     CheckDefinition = Data.define(:name, :klass, :options)
-    NotifierDefinition = Data.define(:name, :klass, :options)
+    class NotifierDefinition
+      SECRET_KEYS = %i[webhook_url routes bot_token url].freeze
+
+      attr_reader :name, :klass, :options
+
+      def initialize(name:, klass:, options:)
+        @name = name
+        @klass = klass
+        @options = options
+      end
+
+      def inspect
+        safe_options = options.transform_values.with_index do |value, _index|
+          value.is_a?(Hash) ? value.transform_values { "[FILTERED]" } : value
+        end
+        SECRET_KEYS.each { |key| safe_options[key] = "[FILTERED]" if safe_options.key?(key) }
+        "#<#{self.class} name=#{name.inspect} options=#{safe_options.inspect}>"
+      end
+    end
 
     BUILT_IN_CHECKS = %i[
       queue_latency queue_size retry_set dead_set process_alive utilization failure_rate stuck_jobs memory redis_health
