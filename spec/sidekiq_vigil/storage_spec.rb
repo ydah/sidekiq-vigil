@@ -42,10 +42,26 @@ RSpec.describe SidekiqVigil::Storage, :redis do
     expect(redis.call("TTL", vigil_storage.key("alerts"))).to eq(-1)
   end
 
+  it "rejects persistent writes outside the explicitly managed alerts hash" do
+    expect do
+      vigil_storage.managed_hash_write("other", "field", "value")
+    end.to raise_error(described_class::UnmanagedPersistentKey, /only alerts/)
+    expect do
+      vigil_storage.acquire_lock("leader", "token", ttl_ms: 0)
+    end.to raise_error(described_class::MissingTTL)
+  end
+
   it "scans only its own namespace" do
     vigil_storage.set("mem:a", 1, ttl: 60)
     redis.call("SET", "other:key", "x", "EX", 60)
 
     expect(vigil_storage.scan("mem:*")).to eq([vigil_storage.key("mem:a")])
+  end
+
+  it "keeps the public Redis key document identical to the executable catalog" do
+    document = File.read(File.expand_path("../../docs/redis_keys.md", __dir__))
+    documented = document.scan(/^\| `([^`]+)` \|/).flatten
+
+    expect(documented).to eq(described_class::KEY_CATALOG.map(&:pattern))
   end
 end

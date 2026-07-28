@@ -5,6 +5,26 @@ require "json"
 module SidekiqVigil
   class Storage
     class MissingTTL < ArgumentError; end
+    class UnmanagedPersistentKey < ArgumentError; end
+
+    KeyDefinition = Data.define(:pattern, :type, :ttl, :owner)
+    KEY_CATALOG = [
+      KeyDefinition.new(pattern: "stats:{yyyymmddHHMM}", type: "hash", ttl: "8 days", owner: "Reporter"),
+      KeyDefinition.new(pattern: "exec:{queue}", type: "hash", ttl: "1 hour", owner: "Reporter"),
+      KeyDefinition.new(pattern: "alerts", type: "hash", ttl: "managed", owner: "Alert::Manager"),
+      KeyDefinition.new(pattern: "history:{alert_id}", type: "list", ttl: "24 hours", owner: "Alert::Manager"),
+      KeyDefinition.new(pattern: "snapshot", type: "string", ttl: "interval × 4", owner: "Checker"),
+      KeyDefinition.new(pattern: "leader", type: "string", ttl: "interval × 3", owner: "LeaderElection"),
+      KeyDefinition.new(pattern: "mem:{process_id}", type: "string", ttl: "flush interval × 3", owner: "Reporter"),
+      KeyDefinition.new(pattern: "config_digest", type: "hash", ttl: "1 hour", owner: "Reporter"),
+      KeyDefinition.new(pattern: "mute", type: "string", ttl: "requested duration", owner: "Alert::Mute"),
+      KeyDefinition.new(
+        pattern: "check_state:{check-specific-suffix}",
+        type: "string",
+        ttl: "check-specific",
+        owner: "Checks"
+      )
+    ].freeze
 
     attr_reader :prefix
 
@@ -54,6 +74,8 @@ module SidekiqVigil
     end
 
     def managed_hash_write(suffix, field, value)
+      raise UnmanagedPersistentKey, "only alerts may be written without a ttl" unless suffix == "alerts"
+
       with_redis { |redis| redis.call("HSET", key(suffix), field, value) }
     end
 
@@ -100,6 +122,8 @@ module SidekiqVigil
     end
 
     def acquire_lock(suffix, token, ttl_ms:)
+      raise MissingTTL, "a positive ttl is required" unless ttl_ms.is_a?(Numeric) && ttl_ms.positive?
+
       with_redis { |redis| redis.call("SET", key(suffix), token, "NX", "PX", ttl_ms) == "OK" }
     end
 
