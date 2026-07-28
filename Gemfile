@@ -9,6 +9,7 @@ gem "appraisal", "~> 2.5"
 gem "benchmark", "~> 0.4"
 gem "irb"
 gem "rack-test", "~> 2.2"
+gem "railties", ">= 7.0", "< 9"
 gem "rake", "~> 13.0"
 gem "rspec", "~> 3.0"
 gem "rubocop", "~> 1.75", require: false

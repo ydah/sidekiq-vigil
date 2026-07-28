@@ -42,6 +42,8 @@ SidekiqVigil.configure do |config|
     alerting.cooldown = 600
     alerting.resolve_notice = true
     alerting.flap_window = 120
+    alerting.flap_threshold = 4
     alerting.group_threshold = 5
+    alerting.group_top_n = 5
   end
 end
