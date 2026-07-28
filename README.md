@@ -162,6 +162,8 @@ Slack Incoming Webhooks have a fixed channel. Severity routing therefore selects
 
 The generic webhook contract and examples are documented in [docs/webhook_schema.md](docs/webhook_schema.md).
 
+The five Slack Block Kit shapes are contract-tested against JSON previews for [critical](spec/fixtures/slack/critical.json), [warn](spec/fixtures/slack/warn.json), [resolved](spec/fixtures/slack/resolved.json), [still-firing](spec/fixtures/slack/still_firing.json), and [digest](spec/fixtures/slack/digest.json). A real Slack screenshot must come from the manual pre-release check; generated imagery is not used as release evidence.
+
 ## Alert lifecycle
 
 Each `check_name + target` moves through `OK → PENDING → FIRING → RESOLVED → OK`. State survives leader changes and process restarts.
@@ -174,6 +176,8 @@ Each `check_name + target` moves through `OK → PENDING → FIRING → RESOLVED
 - targets that disappear are pruned every cycle.
 - more than `group_threshold` events in one cycle become one digest with severity counts and `group_top_n` details.
 - mute windows continue state transitions but suppress delivery; unmute reports current firing state once.
+
+Mute cron expressions use the standard five fields and support lists (`1,3`), ranges (`1-5`), and steps (`*/10`). When both day-of-month and weekday are restricted, standard cron OR semantics apply.
 
 All Redis keys start with `vigil:<key_prefix>:`. The Storage API rejects non-positive or missing TTLs except for the explicitly managed `alerts` hash. The complete, contract-tested key list is in [docs/redis_keys.md](docs/redis_keys.md).
 
