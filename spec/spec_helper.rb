@@ -1,15 +1,28 @@
 # frozen_string_literal: true
 
-require "sidekiq/vigil"
+require "simplecov"
+
+SimpleCov.start do
+  enable_coverage :branch
+  add_filter "/spec/"
+  minimum_coverage 85
+end
+
+require "redis-client"
+require "sidekiq_vigil"
+
+Dir[File.join(__dir__, "support/**/*.rb")].each { |file| require file }
 
 RSpec.configure do |config|
-  # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"
-
-  # Disable RSpec exposing methods globally on `Module` and `main`
   config.disable_monkey_patching!
+  config.order = :random
 
   config.expect_with :rspec do |c|
     c.syntax = :expect
+  end
+
+  config.before do
+    SidekiqVigil.reset!
   end
 end

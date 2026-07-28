@@ -1,10 +1,7 @@
 # frozen_string_literal: true
 
-require_relative "vigil/version"
+require_relative "../sidekiq_vigil"
 
 module Sidekiq
-  module Vigil
-    class Error < StandardError; end
-    # Your code goes here...
-  end
+  Vigil = SidekiqVigil unless const_defined?(:Vigil)
 end

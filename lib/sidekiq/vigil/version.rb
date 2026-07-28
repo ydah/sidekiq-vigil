@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../../sidekiq_vigil/version"
+
 module Sidekiq
-  module Vigil
-    VERSION = "0.1.0"
-  end
+  Vigil = SidekiqVigil unless const_defined?(:Vigil)
 end
