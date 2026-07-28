@@ -1,0 +1,36 @@
+{
+  "text": "⚠️ WARN — queue_latency",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "⚠️ WARN — queue_latency"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        { "type": "mrkdwn", "text": "*Check*\nqueue_latency" },
+        { "type": "mrkdwn", "text": "*Target*\ndefault" },
+        { "type": "mrkdwn", "text": "*Value / threshold*\n75 / 60" },
+        { "type": "mrkdwn", "text": "*Duration*\n1h 1m" },
+        { "type": "mrkdwn", "text": "*Environment*\nproduction" },
+        { "type": "mrkdwn", "text": "*Host*\nworker-1" }
+      ]
+    },
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn", "text": "*Message*\nqueue latency is high" }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "Event firing • Trend ▁█▅ • <https://example.test/sidekiq|Open Sidekiq>"
+        }
+      ]
+    }
+  ]
+}

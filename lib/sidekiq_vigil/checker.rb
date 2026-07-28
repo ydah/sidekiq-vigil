@@ -50,9 +50,10 @@ module SidekiqVigil
       return false unless become_or_remain_leader
 
       results = configured_checks.flat_map(&:execute)
+      events = alert_manager.process(results)
       write_snapshot(results)
       warn_config_drift
-      notifier_manager.notify(alert_manager.process(results))
+      notifier_manager.notify(events)
       @direct_redis_notified = false
       results
     rescue StandardError => e
@@ -91,8 +92,16 @@ module SidekiqVigil
     end
 
     def write_snapshot(results)
-      payload = JSON.generate(timestamp: clock.call.utc.iso8601, results: results.map(&:to_h))
+      payload = JSON.generate(
+        timestamp: clock.call.utc.iso8601,
+        results: results.map(&:to_h),
+        alerts: alert_states
+      )
       storage.set("snapshot", payload, ttl: config.interval * 4)
+    end
+
+    def alert_states
+      storage.hash_get_all("alerts").transform_values { |payload| JSON.parse(payload) }
     end
 
     def warn_config_drift

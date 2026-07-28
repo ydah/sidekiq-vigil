@@ -1,0 +1,36 @@
+{
+  "text": "✅ RESOLVED — queue_size",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "✅ RESOLVED — queue_size"
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        { "type": "mrkdwn", "text": "*Check*\nqueue_size" },
+        { "type": "mrkdwn", "text": "*Target*\ncritical" },
+        { "type": "mrkdwn", "text": "*Value / threshold*\n0 / 50" },
+        { "type": "mrkdwn", "text": "*Duration*\n1h 1m" },
+        { "type": "mrkdwn", "text": "*Environment*\nproduction" },
+        { "type": "mrkdwn", "text": "*Host*\nworker-1" }
+      ]
+    },
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn", "text": "*Message*\nqueue depth recovered" }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "Event resolved • Trend ▁█▅ • <https://example.test/sidekiq|Open Sidekiq>"
+        }
+      ]
+    }
+  ]
+}

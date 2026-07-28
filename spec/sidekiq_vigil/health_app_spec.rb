@@ -9,12 +9,13 @@ RSpec.describe SidekiqVigil::HealthApp, :redis do
   let(:vigil_storage) { storage(prefix: "health") }
   let(:app) { described_class.new(storage: vigil_storage, interval: 30, clock: -> { now }) }
 
-  def write_snapshot(timestamp:, severities: ["ok"])
+  def write_snapshot(timestamp:, severities: ["ok"], alerts: {})
     payload = {
       timestamp: timestamp.iso8601,
       results: severities.map.with_index do |severity, index|
         { check_name: "check_#{index}", target: "global", severity: }
-      end
+      end,
+      alerts:
     }
     vigil_storage.set("snapshot", JSON.generate(payload), ttl: 120)
   end
@@ -39,14 +40,37 @@ RSpec.describe SidekiqVigil::HealthApp, :redis do
   end
 
   it "returns detailed status and age" do
-    write_snapshot(timestamp: now - 10)
+    write_snapshot(
+      timestamp: now - 10,
+      alerts: {
+        "check_0:global" => {
+          status: "firing",
+          first_seen_at: now.to_f - 20
+        }
+      }
+    )
 
     get "/status.json"
     body = JSON.parse(last_response.body)
 
     expect(last_response.status).to eq(200)
     expect(body).to include("age_seconds" => 10.0, "fresh" => true)
-    expect(body.fetch("results").first).to include("check_name" => "check_0")
+    expect(body.fetch("results").first).to include(
+      "check_name" => "check_0",
+      "alert_state" => include("status" => "firing")
+    )
+  end
+
+  it "reports an OK alert state for snapshots written before alert-state support" do
+    payload = {
+      timestamp: now.iso8601,
+      results: [{ check_name: "legacy", target: "global", severity: "ok" }]
+    }
+    vigil_storage.set("snapshot", JSON.generate(payload), ttl: 120)
+
+    get "/status.json"
+
+    expect(JSON.parse(last_response.body).dig("results", 0, "alert_state", "status")).to eq("ok")
   end
 
   it "fails closed when the snapshot is missing or malformed" do

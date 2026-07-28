@@ -44,7 +44,7 @@ RSpec.describe SidekiqVigil::Checker, :redis do
     first_snapshot = JSON.parse(vigil_storage.get("snapshot"))
 
     expect(results.first.check_name).to eq("test")
-    expect(first_snapshot).to include("timestamp", "results")
+    expect(first_snapshot).to include("timestamp", "results", "alerts")
     expect(CheckerTestCheck.calls).to eq(1)
     expect(notifier_manager).to have_received(:notify)
   end
@@ -60,6 +60,8 @@ RSpec.describe SidekiqVigil::Checker, :redis do
     )
 
     expect(instance.run_once).to be_an(Array)
+    snapshot = JSON.parse(vigil_storage.get("snapshot"))
+    expect(snapshot.fetch("alerts").fetch("test:global")).to include("status" => "ok")
   end
 
   it "does not execute checks when leadership is held elsewhere" do

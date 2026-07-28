@@ -37,7 +37,9 @@ The generic webhook notifier sends one JSON object per alert event. The normativ
     "threshold": 200,
     "message": "250 jobs waiting",
     "suppressed": false,
-    "flap_notified": false
+    "flap_notified": false,
+    "flapping_until": null,
+    "transition_timestamps": [1785240000.0]
   },
   "history": [
     { "timestamp": 1785239970.0, "value": 190, "severity": "warn" },

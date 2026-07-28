@@ -57,13 +57,14 @@ RSpec.describe SidekiqVigil::CLI, :redis do
       "snapshot",
       JSON.generate(
         timestamp: "2026-07-28T12:00:00Z",
-        results: [{ severity: "ok", check_name: "queue_size", target: "default" }]
+        results: [{ severity: "ok", check_name: "queue_size", target: "default" }],
+        alerts: { "queue_size:default" => { status: "firing" } }
       ),
       ttl: 60
     )
 
     expect(cli.run(["status"])).to eq(described_class::EXIT_OK)
-    expect(out.string).to include("Snapshot: 2026-07-28T12:00:00Z", "OK\tqueue_size\tdefault")
+    expect(out.string).to include("Snapshot: 2026-07-28T12:00:00Z", "OK\tqueue_size\tdefault\tFIRING")
   end
 
   it "creates and clears a manual mute" do

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "socket"
 
 module SidekiqVigil
   module Notifier
@@ -40,11 +41,7 @@ module SidekiqVigil
       def payload(event)
         {
           text: header(event),
-          blocks: [
-            { type: "header", text: { type: "plain_text", text: header(event) } },
-            { type: "section", fields: fields(event) },
-            context_block(event)
-          ].compact
+          blocks: event.transition == :digest ? digest_blocks(event) : alert_blocks(event)
         }
       end
 
@@ -68,23 +65,75 @@ module SidekiqVigil
       def fields(event)
         result = event.result
         [
+          markdown_field("*Check*\n#{display(result.check_name)}"),
           markdown_field("*Target*\n#{result.target}"),
-          markdown_field("*Event*\n#{event.transition}"),
           markdown_field("*Value / threshold*\n#{display(result.value)} / #{display(result.threshold)}"),
-          markdown_field("*Message*\n#{result.message || '-'}")
+          markdown_field("*Duration*\n#{duration(event)}"),
+          markdown_field("*Environment*\n#{environment}"),
+          markdown_field("*Host*\n#{host}")
         ]
       end
 
       def context_block(event)
-        parts = []
+        parts = ["Event #{event.transition}"]
         spark = sparkline(event.history)
         parts << "Trend #{spark}" unless spark.empty?
         parts << "<#{options[:web_ui_url]}|Open Sidekiq>" if options[:web_ui_url]
-        mention = options.fetch(:mention, {})[event.severity]
+        mentions = options.fetch(:mention, {})
+        mention = mentions[event.severity] || mentions[event.severity.to_s]
         parts << mention if mention
-        return if parts.empty?
 
         { type: "context", elements: [{ type: "mrkdwn", text: parts.join(" • ") }] }
+      end
+
+      def alert_blocks(event)
+        [
+          header_block(event),
+          { type: "section", fields: fields(event) },
+          message_block(event.result.message),
+          context_block(event)
+        ].compact
+      end
+
+      def digest_blocks(event)
+        metadata = event.result.metadata
+        [
+          header_block(event),
+          { type: "section", text: { type: "mrkdwn", text: digest_counts(metadata.fetch(:counts)) } },
+          { type: "section", text: { type: "mrkdwn", text: digest_top(metadata.fetch(:top)) } },
+          context_block(event)
+        ]
+      end
+
+      def header_block(event)
+        { type: "header", text: { type: "plain_text", text: header(event) } }
+      end
+
+      def message_block(message)
+        return unless message
+
+        { type: "section", text: { type: "mrkdwn", text: "*Message*\n#{message}" } }
+      end
+
+      def digest_counts(counts)
+        labels = { error: "Error", critical: "Critical", warn: "Warn", ok: "OK" }
+        values = labels.filter_map do |severity, label|
+          count = counts[severity] || counts[severity.to_s]
+          "#{label}: #{count}" if count.to_i.positive?
+        end
+        "*Severity counts*\n#{values.join(' • ')}"
+      end
+
+      def digest_top(alerts)
+        lines = alerts.map do |alert|
+          severity = fetch_value(alert, :severity).to_s.upcase
+          check = fetch_value(alert, :check_name)
+          target = fetch_value(alert, :target)
+          value = display(fetch_value(alert, :value))
+          threshold = display(fetch_value(alert, :threshold))
+          "• *#{severity}* #{check} / #{target} — #{value} / #{threshold}"
+        end
+        "*Top alerts*\n#{lines.join("\n")}"
       end
 
       def markdown_field(text)
@@ -110,6 +159,29 @@ module SidekiqVigil
 
       def display(value)
         value.nil? ? "-" : value.to_s
+      end
+
+      def duration(event)
+        started_at = event.state.first_seen_at
+        return "-" unless started_at
+
+        seconds = [event.timestamp.to_f - started_at.to_f, 0].max.round
+        return "#{seconds}s" if seconds < 60
+        return "#{seconds / 60}m #{seconds % 60}s" if seconds < 3_600
+
+        "#{seconds / 3_600}h #{(seconds % 3_600) / 60}m"
+      end
+
+      def environment
+        options.fetch(:environment) { ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "unknown" }
+      end
+
+      def host
+        options.fetch(:host) { Socket.gethostname }
+      end
+
+      def fetch_value(hash, key)
+        hash[key] || hash[key.to_s]
       end
 
       def safe_error(error)

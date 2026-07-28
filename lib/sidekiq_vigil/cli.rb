@@ -127,7 +127,11 @@ module SidekiqVigil
       snapshot = JSON.parse(raw)
       out.puts("Snapshot: #{snapshot.fetch('timestamp')}")
       snapshot.fetch("results").each do |result|
-        out.puts([result.fetch("severity").upcase, result.fetch("check_name"), result.fetch("target")].join("\t"))
+        alert_id = "#{result.fetch('check_name')}:#{result.fetch('target')}"
+        alert_status = snapshot.fetch("alerts", {}).dig(alert_id, "status") || "ok"
+        out.puts(
+          [result.fetch("severity").upcase, result.fetch("check_name"), result.fetch("target"), alert_status.upcase].join("\t")
+        )
       end
       EXIT_OK
     end

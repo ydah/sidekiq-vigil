@@ -19,7 +19,22 @@ end
 
 RSpec.describe "notifiers" do
   let(:timestamp) { Time.utc(2026, 7, 28, 12, 0) }
-  let(:state) { SidekiqVigil::Alert::State.new(status: "firing", severity: "critical") }
+  let(:state) do
+    SidekiqVigil::Alert::State.new(
+      status: "firing",
+      severity: "critical",
+      first_seen_at: timestamp.to_f - 3_661
+    )
+  end
+  let(:slack_options) do
+    {
+      webhook_url: "https://hooks.slack.test/default",
+      environment: "production",
+      host: "worker-1",
+      web_ui_url: "https://example.test/sidekiq",
+      mention: { critical: "<!here>" }
+    }
+  end
   let(:result) do
     SidekiqVigil::Result.new(
       check_name: "queue_size",
@@ -41,24 +56,47 @@ RSpec.describe "notifiers" do
     )
   end
 
-  it "renders Block Kit layouts for all five notification shapes" do
-    slack = SidekiqVigil::Notifier::Slack.new(options: { webhook_url: "https://hooks.slack.test/default" })
-    warn_result = SidekiqVigil::Result.new(check_name: "latency", severity: :warn)
-    digest = SidekiqVigil::Alert::DigestEvent.new(events: [event], timestamp:)
-    cases = {
-      critical: [event, "🔥 CRITICAL"],
-      warn: [event(result: warn_result), "⚠️ WARN"],
-      resolved: [event(transition: :resolved), "✅ RESOLVED"],
-      still_firing: [event(transition: :still_firing), "🔥 CRITICAL"],
-      digest: [digest, "📦 DIGEST"]
+  def notification_cases
+    warn_result = SidekiqVigil::Result.new(
+      check_name: "queue_latency",
+      target: "default",
+      severity: :warn,
+      value: 75,
+      threshold: 60,
+      message: "queue latency is high"
+    )
+    resolved_result = SidekiqVigil::Result.new(
+      check_name: "queue_size",
+      target: "critical",
+      severity: :ok,
+      value: 0,
+      threshold: 50,
+      message: "queue depth recovered"
+    )
+    critical = event
+    warn = event(result: warn_result)
+
+    {
+      critical:,
+      warn:,
+      resolved: event(transition: :resolved, result: resolved_result),
+      still_firing: event(transition: :still_firing),
+      digest: SidekiqVigil::Alert::DigestEvent.new(events: [critical, warn], timestamp:)
     }
+  end
 
-    headers = cases.transform_values do |(notification, _expected)|
-      slack.payload(notification).dig(:blocks, 0, :text, :text)
+  it "matches and posts fixed Block Kit snapshots for all five notification shapes" do
+    notification_cases.each do |name, notification|
+      url = "https://hooks.slack.test/#{name}"
+      slack = SidekiqVigil::Notifier::Slack.new(options: slack_options.merge(webhook_url: url))
+      fixture = JSON.parse(File.read(File.join(__dir__, "../fixtures/slack/#{name}.json")))
+      payload = JSON.parse(JSON.generate(slack.payload(notification)))
+      request = stub_request(:post, url).with(body: fixture).to_return(status: 200, body: "ok")
+
+      expect(payload).to eq(fixture)
+      expect(slack.notify(notification)).to be(true)
+      expect(request).to have_been_requested.once
     end
-
-    cases.each { |name, (_notification, expected)| expect(headers.fetch(name)).to start_with(expected) }
-    expect(slack.payload(event).to_s).to include("Trend ▁█▅")
   end
 
   it "routes severities to separate webhook URLs" do
@@ -70,14 +108,6 @@ RSpec.describe "notifiers" do
 
     expect(slack.notify(event)).to be(true)
     expect(transport.requests.first[:url]).to eq("https://hooks.slack.test/incidents")
-  end
-
-  it "posts Block Kit through Net::HTTP with WebMock verification" do
-    request = stub_request(:post, "https://hooks.slack.test/default").to_return(status: 200, body: "ok")
-    slack = SidekiqVigil::Notifier::Slack.new(options: { webhook_url: "https://hooks.slack.test/default" })
-
-    expect(slack.notify(event)).to be(true)
-    expect(request).to have_been_requested.once
   end
 
   it "retries with exponential backoff and falls back to log" do

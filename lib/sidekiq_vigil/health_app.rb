@@ -46,8 +46,15 @@ module SidekiqVigil
       snapshot = JSON.parse(raw)
       age = clock.call - Time.iso8601(snapshot.fetch("timestamp"))
       fresh = age <= interval * 2
-      checks_ok = snapshot.fetch("results").all? { |result| result.fetch("severity") == "ok" }
-      snapshot.merge(healthy: checks_ok && fresh, fresh:, age_seconds: age.round(3))
+      alerts = snapshot.fetch("alerts", {})
+      results = snapshot.fetch("results").map { |result| with_alert_state(result, alerts) }
+      checks_ok = results.all? { |result| result.fetch("severity") == "ok" }
+      snapshot.merge("results" => results, "alerts" => alerts, healthy: checks_ok && fresh, fresh:, age_seconds: age.round(3))
+    end
+
+    def with_alert_state(result, alerts)
+      alert_id = "#{result.fetch('check_name')}:#{result.fetch('target')}"
+      result.merge("alert_state" => alerts.fetch(alert_id, { "status" => "ok" }))
     end
 
     def response(status, body)

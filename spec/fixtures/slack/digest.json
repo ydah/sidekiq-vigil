@@ -1,0 +1,35 @@
+{
+  "text": "📦 DIGEST — 2 alerts in this cycle",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "📦 DIGEST — 2 alerts in this cycle"
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Severity counts*\nCritical: 1 • Warn: 1"
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Top alerts*\n• *CRITICAL* queue_size / critical — 100 / 50\n• *WARN* queue_latency / default — 75 / 60"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "Event digest • <https://example.test/sidekiq|Open Sidekiq> • <!here>"
+        }
+      ]
+    }
+  ]
+}
