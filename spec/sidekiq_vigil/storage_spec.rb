@@ -64,4 +64,24 @@ RSpec.describe SidekiqVigil::Storage, :redis do
 
     expect(documented).to eq(described_class::KEY_CATALOG.map(&:pattern))
   end
+
+  it "builds a pooled explicit connection safe for Reporter and Checker threads" do
+    config = SidekiqVigil::Config.new
+    config.key_prefix = "pooled"
+    config.redis = {
+      url: ENV.fetch("VIGIL_REDIS_URL", "redis://127.0.0.1:16379/15"),
+      pool_size: 2,
+      pool_timeout: 1
+    }
+    pooled_storage = SidekiqVigil.build_storage(config)
+    threads = 2.times.map do
+      Thread.new do
+        25.times { pooled_storage.hash_increment("stats:concurrent", { "processed" => 1 }, ttl: 60) }
+      end
+    end
+
+    threads.each(&:join)
+
+    expect(pooled_storage.hash_get_all("stats:concurrent").fetch("processed")).to eq("50")
+  end
 end

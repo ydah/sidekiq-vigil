@@ -20,7 +20,7 @@ SidekiqVigil.configure do |config|
   config.redis = { url: ENV.fetch("VIGIL_REDIS_URL") }
   config.checks.clear
   config.check :queue_size,
-               queues: %w[vigil_e2e_a vigil_e2e_b vigil_e2e_c],
+               queues: %w[vigil_e2e_a vigil_e2e_b vigil_e2e_c vigil_e2e_d],
                warn: 1,
                critical: 1
   config.check :queue_latency,
@@ -32,6 +32,6 @@ SidekiqVigil.configure do |config|
   config.alerting do |alerting|
     alerting.pending_cycles = 1
     alerting.cooldown = 60
-    alerting.group_threshold = 2
+    alerting.group_threshold = 3
   end
 end

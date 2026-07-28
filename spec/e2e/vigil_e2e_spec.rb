@@ -17,6 +17,7 @@ RSpec.describe "Sidekiq Vigil end to end", :e2e do
     Sidekiq::Client.push("class" => "VigilE2EJob", "queue" => "vigil_e2e_a", "args" => [])
     Sidekiq::Client.push("class" => "VigilE2EJob", "queue" => "vigil_e2e_b", "args" => [])
     Sidekiq::Client.push("class" => "VigilE2EJob", "queue" => "vigil_e2e_c", "args" => [])
+    Sidekiq::Client.push("class" => "VigilE2EJob", "queue" => "vigil_e2e_d", "args" => [])
     Sidekiq::Client.push("class" => "VigilE2EJob", "queue" => "vigil_e2e_worker", "args" => ["fail"])
     sleep(1.1)
     fixture = File.expand_path("../fixtures/e2e_worker.rb", __dir__)
@@ -75,13 +76,18 @@ RSpec.describe "Sidekiq Vigil end to end", :e2e do
   end
 
   def next_message(server, prefix: nil)
+    observed = []
     Timeout.timeout(15) do
       loop do
         message = server.messages.pop
         return message unless prefix
         return message if message.fetch("text").start_with?(prefix)
+
+        observed << message.fetch("text")
       end
     end
+  rescue Timeout::Error
+    raise Timeout::Error, "waiting for #{prefix.inspect}; observed #{observed.inspect}"
   end
 
   def terminate(pid)

@@ -96,6 +96,7 @@ module SidekiqVigil
       raise ConfigError, "key_prefix contains unsupported characters" unless key_prefix.to_s.match?(/\A[\w.-]+\z/)
       raise ConfigError, "timezone must not be empty" if timezone.to_s.empty?
 
+      validate_redis!
       checks.each { |definition| validate_options!(definition.options, "check #{definition.name}") }
       notifiers.each { |definition| validate_notifier!(definition) }
       alerting.validate!
@@ -180,6 +181,22 @@ module SidekiqVigil
         raise ConfigError,
               "invalid Slack mention #{mention.inspect}; use <@U…>, <!subteam^S…>, or <!here>"
       end
+    end
+
+    def validate_redis!
+      return unless redis
+      raise ConfigError, "redis must be a Hash" unless redis.is_a?(Hash)
+
+      pool_size = redis_option(:pool_size, 5)
+      pool_timeout = redis_option(:pool_timeout, 1)
+      raise ConfigError, "redis pool_size must be a positive integer" unless pool_size.is_a?(Integer) && pool_size.positive?
+      return if pool_timeout.is_a?(Numeric) && pool_timeout.positive?
+
+      raise ConfigError, "redis pool_timeout must be positive"
+    end
+
+    def redis_option(name, default)
+      redis.fetch(name) { redis.fetch(name.to_s, default) }
     end
   end
 

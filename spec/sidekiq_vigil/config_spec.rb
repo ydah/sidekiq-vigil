@@ -98,6 +98,13 @@ RSpec.describe SidekiqVigil::Config do
     expect { config.validate! }.to raise_error(SidekiqVigil::ConfigError, /positive integer/)
   end
 
+  it "validates explicit Redis pool settings before runtime startup" do
+    config = described_class.new
+    config.redis = { url: "redis://localhost", pool_size: 0 }
+
+    expect { config.validate! }.to raise_error(SidekiqVigil::ConfigError, /pool_size/)
+  end
+
   it "rejects plain-text Slack mentions with actionable guidance" do
     config = described_class.new(environment: "production")
     config.notifier(:slack, webhook_url: "https://hooks.slack.test/a", mention: { critical: "@oncall" })

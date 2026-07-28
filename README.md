@@ -128,7 +128,11 @@ SidekiqVigil.configure do |config|
   config.flush_interval = 10
   config.key_prefix = "myapp"
   config.timezone = "Asia/Tokyo"
-  config.redis = { url: ENV["REDIS_URL"] }
+  config.redis = {
+    url: ENV["REDIS_URL"],
+    pool_size: 5,
+    pool_timeout: 1
+  }
 
   config.notifier :slack,
     webhook_url: ENV["SLACK_WEBHOOK_DEFAULT"],
@@ -143,8 +147,10 @@ SidekiqVigil.configure do |config|
     alerting.cooldown = 600
     alerting.resolve_notice = true
     alerting.flap_window = 120
+    alerting.flap_threshold = 4
     alerting.escalate_after = 3
     alerting.group_threshold = 5
+    alerting.group_top_n = 5
     alerting.mutes = [
       { cron: "0 3 * * 0", duration: 3_600, reason: "weekly maintenance" }
     ]
@@ -163,13 +169,13 @@ Each `check_name + target` moves through `OK → PENDING → FIRING → RESOLVED
 - `pending_cycles` removes single-cycle noise.
 - `cooldown` controls ongoing notifications.
 - `escalate_after` upgrades sustained warnings to critical.
-- rapid recurrence inside `flap_window` emits one flapping event.
+- `flap_threshold` transitions inside `flap_window` emit one flapping event and hold refiring until the window closes.
 - history retains the latest 30 values for 24 hours.
 - targets that disappear are pruned every cycle.
-- more than `group_threshold` events in one cycle become one digest.
+- more than `group_threshold` events in one cycle become one digest with severity counts and `group_top_n` details.
 - mute windows continue state transitions but suppress delivery; unmute reports current firing state once.
 
-All Redis keys start with `vigil:<key_prefix>:`. The Storage API rejects non-positive or missing TTLs except for the explicitly managed `alerts` hash.
+All Redis keys start with `vigil:<key_prefix>:`. The Storage API rejects non-positive or missing TTLs except for the explicitly managed `alerts` hash. The complete, contract-tested key list is in [docs/redis_keys.md](docs/redis_keys.md).
 
 ## Existing tools
 

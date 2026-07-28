@@ -33,7 +33,9 @@ module SidekiqVigil
     def build_storage(configuration = config)
       redis = if configuration.redis
                 options = configuration.redis.transform_keys(&:to_sym).compact
-                RedisClient.config(**options).new_client
+                pool_size = options.delete(:pool_size) || 5
+                pool_timeout = options.delete(:pool_timeout) || 1
+                RedisClient.config(**options).new_pool(size: pool_size, timeout: pool_timeout)
               end
       Storage.new(redis:, key_prefix: configuration.key_prefix)
     end

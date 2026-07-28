@@ -72,7 +72,8 @@ module SidekiqVigil
     def configure_sidekiq_api
       return unless config.redis
 
-      Sidekiq.configure_client { |sidekiq| sidekiq.redis = config.redis.compact }
+      options = config.redis.compact.reject { |key, _value| %i[pool_size pool_timeout].include?(key.to_sym) }
+      Sidekiq.configure_client { |sidekiq| sidekiq.redis = options }
     end
 
     def run_forever(_args = [])
