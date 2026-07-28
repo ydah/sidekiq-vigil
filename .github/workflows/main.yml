@@ -1,23 +1,46 @@
-name: Ruby
+name: CI
 
 on:
   push:
     branches:
       - main
-
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 18 * * *"
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  test:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
-    name: Ruby ${{ matrix.ruby }}
+    name: Ruby ${{ matrix.ruby }} / ${{ matrix.sidekiq }}
+    env:
+      BUNDLE_GEMFILE: gemfiles/${{ matrix.sidekiq }}.gemfile
+      VIGIL_REDIS_URL: redis://127.0.0.1:6379/15
     strategy:
+      fail-fast: false
       matrix:
         ruby:
-          - '4.0'
+          - "3.2"
+          - "3.3"
+          - "3.4"
+        sidekiq:
+          - sidekiq_7
+          - sidekiq_8
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 20
 
     steps:
       - uses: actions/checkout@v6
@@ -30,3 +53,47 @@ jobs:
           bundler-cache: true
       - name: Run the default task
         run: bundle exec rake
+
+  benchmark:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - run: bundle exec ruby benchmark/middleware_overhead.rb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: middleware-overhead
+          path: benchmark/results/middleware_overhead.json
+
+  e2e:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - name: Run end-to-end suite
+        env:
+          VIGIL_E2E: "1"
+          VIGIL_REDIS_URL: redis://127.0.0.1:6379/14
+        run: bundle exec rspec spec/e2e

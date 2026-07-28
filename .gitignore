@@ -4,6 +4,7 @@
 /.yardoc
 /_yardoc/
 /coverage/
+/benchmark/results/
 /doc/
 /pkg/
 /spec/reports/

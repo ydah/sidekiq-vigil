@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ydah/sidekiq-vigil/blob/main/docs/webhook_event.schema.json",
+  "title": "Sidekiq Vigil webhook event",
+  "type": "object",
+  "required": ["schema_version", "event", "alert_id", "timestamp"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "event": {
+      "enum": ["firing", "still_firing", "resolved", "escalated", "flapping", "unmuted", "digest"]
+    },
+    "alert_id": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "alert": {
+      "type": "object",
+      "required": ["check_name", "target", "severity", "metadata"],
+      "properties": {
+        "check_name": { "type": "string" },
+        "target": { "type": "string" },
+        "severity": { "enum": ["ok", "warn", "critical", "error"] },
+        "value": {},
+        "threshold": {},
+        "message": { "type": ["string", "null"] },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "state": { "type": "object" },
+    "history": { "type": "array" },
+    "counts": { "type": "object" },
+    "alerts": { "type": "array" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event": { "const": "digest" } } },
+      "then": { "required": ["counts", "alerts"] },
+      "else": { "required": ["alert", "state", "history"] }
+    }
+  ],
+  "additionalProperties": false
+}
