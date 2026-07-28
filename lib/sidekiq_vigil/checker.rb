@@ -40,6 +40,7 @@ module SidekiqVigil
 
     def stop
       @running = false
+      thread&.wakeup if thread&.status == "sleep"
       thread&.join(config.interval + 1)
       leader_election.release
       @thread = nil

@@ -31,6 +31,7 @@ module SidekiqVigil
 
     def stop
       @running = false
+      thread&.wakeup if thread&.status == "sleep"
       thread&.join(config.flush_interval + 1)
       @thread = nil
     end
