@@ -104,7 +104,9 @@ RSpec.describe SidekiqVigil::CLI, :redis do
         SidekiqVigil.configure do |config|
           config.interval = 0.1
           config.key_prefix = "cli-child"
-          config.redis = { url: "redis://127.0.0.1:16379/15" }
+          config.redis = {
+            url: ENV.fetch("VIGIL_REDIS_URL", "redis://127.0.0.1:16379/15")
+          }
           config.checks.clear
         end
       RUBY
@@ -117,7 +119,9 @@ RSpec.describe SidekiqVigil::CLI, :redis do
         out: File::NULL,
         err: File::NULL
       )
-      sleep(0.3)
+      Timeout.timeout(5) do
+        sleep(0.05) until redis.call("EXISTS", "vigil:cli-child:leader") == 1
+      end
       Process.kill("TERM", pid)
       Timeout.timeout(5) { Process.wait(pid) }
 
