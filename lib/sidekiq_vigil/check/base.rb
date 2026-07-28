@@ -3,13 +3,14 @@
 module SidekiqVigil
   module Check
     class Base
-      attr_reader :storage, :options, :clock, :logger
+      attr_reader :storage, :options, :clock, :logger, :api
 
-      def initialize(storage:, options: {}, clock: -> { Time.now }, logger: SidekiqVigil.logger)
+      def initialize(storage:, options: {}, clock: -> { Time.now }, logger: SidekiqVigil.logger, api: SidekiqApi.new)
         @storage = storage
         @options = options
         @clock = clock
         @logger = logger
+        @api = api
       end
 
       def execute
