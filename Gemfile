@@ -13,5 +13,5 @@ gem "railties", ">= 7.0", "< 9"
 gem "rake", "~> 13.0"
 gem "rspec", "~> 3.0"
 gem "rubocop", "~> 1.75", require: false
-gem "simplecov", "~> 0.22", require: false
+gem "simplecov", "~> 1.0", require: false
 gem "webmock", "~> 3.24", require: false
